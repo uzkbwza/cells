@@ -220,14 +220,17 @@ pub fn update_powder(api: &mut SandApi, cell: Cell) -> Result<(), Error> {
 }
 
 pub fn update_sand(api: &mut SandApi, cell: Cell) -> Result<(), Error> {
+
     let mut rng = thread_rng();
     let fall_probability = rng.gen::<u32>() % 100;
     if fall_probability < 10 {
         return Ok(()) // stay in place this frame
     }
+
     // occasionally absorb water, become mud
     use Species::*;
-    for neighbor in api.neighbors()?.iter_mut() {
+    let mut neighbors = api.neighbors()?;
+    for neighbor in neighbors.iter_mut() {
         if let Water{ .. } = neighbor.cell.species { 
             let absorb_probability = rng.gen::<u32>() % 100;
             if absorb_probability < 1 && neighbor.dy < 0 {
@@ -345,8 +348,6 @@ pub fn update_soil(api: &mut SandApi, cell: Cell) -> Result<(), Error> {
     update_coarse(api, cell)?;
     let mut rng = thread_rng();
     if api.is_empty(0, -1) 
-    && api.is_empty(1, -2) 
-    && api.is_empty(-1, -2) 
     && rng.gen::<u32>() % 100 < 1 {
         api.set(0, -1, Cell::new(Species::Grass))?; 
     }

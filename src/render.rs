@@ -86,8 +86,8 @@ pub fn render_cursor<T: RenderTarget>(controls: &Controls, canvas: &mut Canvas<T
             canvas.set_draw_color(Color::BLACK);
             return Ok(());
     }
-    for a in -(radius + 1)..(radius + 1) {
-        for b in -(radius + 1)..(radius + 1) {
+    for a in -radius..=radius {
+        for b in -radius..=radius {
             let nx = a + x;
             let ny = b + y; 
             if util::distance(x, y, nx, ny).round() as i32 == radius {

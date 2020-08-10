@@ -138,8 +138,8 @@ impl SandApi {
             return Ok(());
 
         }
-        for a in -radius..radius {
-            for b in -radius..radius {
+        for a in -radius..=radius {
+            for b in -radius..=radius {
                 let nx = a + x;
                 let ny = b + y; 
                 if let Ok(c) = self.get_absolute(nx, ny) {
@@ -163,8 +163,8 @@ impl SandApi {
                 }
             }
         }
-        for a in -radius..radius {
-            for b in -radius..radius {
+        for a in -radius..=radius {
+            for b in -radius..=radius {
                 let nx = a + x;
                 let ny = b + y; 
                 if let Ok(c) = self.get_absolute(nx, ny) {
