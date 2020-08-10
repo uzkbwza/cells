@@ -9,4 +9,4 @@ edition = "2018"
 [dependencies]
 sdl2 = "*"
 rand = "*"
-vecmap = { git = "https://github.com/uzkbwza/vecmap#master"}
+vecmap = { git = "https://github.com/uzkbwza/vecmap", branch = "master"}

@@ -117,7 +117,7 @@ dependencies = [
 [[package]]
 name = "vecmap"
 version = "0.1.0"
-source = "git+https://github.com/uzkbwza/vecmap#master#9fec06c310fe1024739f8cf97076b016ba37d4a1"
+source = "git+https://github.com/uzkbwza/vecmap?branch=master#9fec06c310fe1024739f8cf97076b016ba37d4a1"
 
 [[package]]
 name = "version-compare"
