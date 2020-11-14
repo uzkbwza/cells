@@ -1,8 +1,10 @@
+#![feature(clamp)]
 extern crate sdl2; 
 pub mod cell;
 pub mod render;
 pub mod api;
 pub mod util;
+pub mod map2d;
 
 use sdl2::pixels::Color;
 use sdl2::event::Event;
@@ -12,11 +14,11 @@ use sdl2::video::Window;
 #[allow(unused_imports)]
 use std::time::Duration;
 use cell::{Cell, Species};
+use sdl2::pixels::PixelFormatEnum;
 
-
-const WIDTH:  u32 = 500;
-const HEIGHT: u32 = 350;
-const SCALE: u32 = 2;
+const WIDTH:  u32 = 360;
+const HEIGHT: u32 = 240;
+const SCALE: u32 = 3;
 
 pub enum ExitCode {
     Success,
@@ -58,7 +60,7 @@ impl Controls {
             mouse_pressed_r: false,
             pause: false,
             selected_species: Species::Sand,
-            radius: 10,
+            radius: 4,
         }
     }
 
@@ -99,16 +101,19 @@ fn poll_controls(controls: &mut Controls, event_pump: &mut sdl2::EventPump) -> O
                             W => Species::Water, 
                             A => Species::Wall,
                             I => Species::Acid,
+                            L => Species::Lava,
+                            T => Species::Salt,
                             _ => controls.selected_species
                         }
                     );
                     controls.set_radius(
                         match k {
                            Num1 => 1,
-                           Num2 => 5, 
-                           Num3 => 10,
-                           Num4 => 20,
-                           Num5 => 30,
+                           Num2 => 2, 
+                           Num3 => 4,
+                           Num4 => 8,
+                           Num5 => 16,
+                           Num6 => 32,
                            _ => controls.radius
                         }
                     );
@@ -142,7 +147,14 @@ fn handle_controls(controls: &Controls, api: &mut api::SandApi) -> Result<(), Er
     }
 
     if controls.mouse_pressed_r {
-        api.erase(controls.mouse_x, controls.mouse_y, controls.radius)?;
+        for point in util::line(
+            controls.mouse_x, 
+            controls.mouse_y, 
+            controls.mouse_last_x, 
+            controls.mouse_last_y) 
+        {
+            api.erase(point.x, point.y, controls.radius)?;
+        }
     }
 
     if controls.pause {
@@ -159,7 +171,7 @@ fn init_canvas(ctx: &sdl2::Sdl) -> Canvas<Window> {
         .unwrap(); 
     let mut canvas = window.into_canvas().build().unwrap(); 
     canvas.set_scale(SCALE as f32, SCALE as f32).unwrap();
-    canvas.set_blend_mode(sdl2::render::BlendMode::Add);
+    //canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
     canvas.clear();
     canvas.present();
     canvas
@@ -171,11 +183,18 @@ pub fn main() -> Result<(), Error>{
     let mut controls = Controls::new();
     let mut canvas = init_canvas(&sdl_context);
     let mut sand_api = api::SandApi::new();
+    let texture_creator = canvas.texture_creator();
+    let mut tex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA8888, WIDTH, HEIGHT).unwrap();
     'running: loop {
-        sdl_context.mouse().show_cursor(false);
         canvas.clear();
+        sdl_context.mouse().show_cursor(false);
+        if controls.mouse_pressed_l || controls.mouse_pressed_r {
+            sdl_context.mouse().capture(true);
+        } else {
+            sdl_context.mouse().capture(false);
+        }
         canvas.set_draw_color(Color::BLACK);
-        render::render(&mut sand_api, &mut canvas)?;
+        render::render(&mut sand_api, &mut canvas, &mut tex)?;
         render::render_cursor(&controls, &mut canvas)?;
         match poll_controls(&mut controls, &mut event_pump) {
             None => {}
@@ -185,7 +204,7 @@ pub fn main() -> Result<(), Error>{
         handle_controls(&mut controls, &mut sand_api)?;
         sand_api.update()?;
         canvas.present();
-        //::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 20));
+        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 120));
     }
     Ok(())
 }

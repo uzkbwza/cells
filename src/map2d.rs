@@ -21,14 +21,17 @@ impl<T> Map2d<T> where T: Clone + Copy {
     }
 
     pub fn retrieve(&self, x: i32, y: i32) -> Result<T, Error> {
-        let id = self.xy_idx(x, y);
-        return Ok(self.items[id])
+        let id = self.xy_idx(x.clamp(0, -1 + WIDTH as i32), y.clamp(0, -1 + HEIGHT as i32));
+        Ok(self.items[id])
     }
 
     pub fn set_point(&mut self, x: i32, y: i32, item: T) -> Result<(), String> {
         let id = self.xy_idx(x, y);
-        self.items[id] = item;
-        return Ok(());
+        if x < self.width && y < self.height && x >=0 && y >= 0 {
+            self.items[id] = item;
+            return Ok(());
+        }
+        Ok(())
     }
 
     pub fn reset_point(&mut self, x: i32, y: i32) -> Result<(), String> {

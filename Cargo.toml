@@ -10,3 +10,7 @@ edition = "2018"
 sdl2 = "*"
 rand = "*"
 vecmap = { git = "https://github.com/uzkbwza/vecmap", branch = "master"}
+
+[profile.release]
+debug = true
+

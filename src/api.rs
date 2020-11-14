@@ -1,9 +1,9 @@
 use crate::cell::*;
 use crate::util;
-use vecmap::*;
+use crate::map2d::*;
 use crate::{WIDTH, HEIGHT, Error};
 
-type CellMap = VecMap<Cell>;
+type CellMap = Map2d<Cell>;
 
 pub struct SandApi {
     x: i32,
@@ -22,7 +22,7 @@ pub struct Neighbor {
 
 impl SandApi {
     pub fn new() -> SandApi {
-        let mut map = VecMap::filled_with(EMPTY, WIDTH as i32, HEIGHT as i32);
+        let mut map = Map2d::filled_with(EMPTY, WIDTH as i32, HEIGHT as i32);
 
 
 
@@ -83,21 +83,27 @@ impl SandApi {
         use Species::*;
         let mut cell = self.get(0, 0)?;
 
-        if cell.clock {
+        if cell.clock || cell == EMPTY || cell.species == Border {
             return Ok(())
         } else { 
             cell.clock = true; 
         }
 
+        cell.heat -= 1; 
         match cell.species {
             Sand => update_sand(self, cell)?,
             Water => update_water(self, cell)?, 
-            Mud{..} => update_mud(self, cell)?,
+            Mud(_) => update_mud(self, cell)?,
             Acid => update_acid(self, cell)?,
             Grass => update_grass(self, cell)?,
             Soil => update_soil(self, cell)?,
             GrassTip => update_grass_tip(self, cell)?,
             Flower(_) => update_flower(self, cell)?,
+            WaterGrass(_) => update_water_grass(self, cell)?,
+            Lava          => update_lava(self, cell)?,
+            Steam         => update_steam(self, cell)?,
+            Salt          => update_salt(self, cell)?,
+            SaltWater     => update_salt_water(self, cell)?,
             _             => {}
         };
 

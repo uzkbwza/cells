@@ -1,1 +1,5 @@
 /target
+src/flamegraph.svg
+src/perf.data
+src/perf.data.old
+.gitignore
