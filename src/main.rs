@@ -87,6 +87,7 @@ fn poll_controls(controls: &mut Controls, event_pump: &mut sdl2::EventPump) -> O
     controls.mouse_x = mouse_state.x() / SCALE as i32;
     controls.mouse_y = mouse_state.y() / SCALE as i32;
 
+    event_pump.disable_event(sdl2::event::EventType::MouseMotion);
     for e in event_pump.poll_iter() {
         match e {
             Event::Quit {..} |
