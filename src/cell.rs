@@ -98,45 +98,27 @@ impl Cell {
         if self.is_liquid() || self.is_gas() {
             return true;
         }
-        match self.species {
-           Empty => true, 
-           _     => false
-        }
+        matches!(self.species, Empty)
     }
 
     pub fn is_gas(&self) -> bool {
         use Species::*;
-        match self.species{
-            Steam => true,
-            _     => false,
-        }
+        matches!(self.species, Steam)
     }
 
     pub fn is_liquid(&self) -> bool {
         use Species::*;
-        match self.species {
-           Water => true, 
-           Acid => true,
-           Lava => true,
-           SaltWater => true,
-           _     => false
-        }
+        matches!(self.species, Water | Acid | Lava | SaltWater)
     }
 
     pub fn is_corrodable(&self) -> bool {
         use Species::*;
-        match self.species { 
-            Empty | Wall | Border | Acid => false,
-            _ => true
-        }
+        !matches!(self.species, Empty | Wall | Border | Acid)
     }
 
     pub fn liquid_destroyable(&self) -> bool {
         use Species::*;
-        match self.species { 
-            Grass | GrassTip | Flower(_) => true,
-            _ => false, 
-        }
+        matches!(self.species, Grass | GrassTip | Flower(_))
     }
 
     // resets grain on cell. this is basically just for using the brush, 
@@ -183,7 +165,7 @@ pub const EMPTY: Cell = Cell {
 
 fn go_toward(api: &mut SandApi, x: i32, y: i32, cell: Cell) -> Result<bool, Error> {
     // tries to go as far as possible towards the next point
-    let mut path = line(0, 0, x, y);
+    let path = line(0, 0, x, y);
     let mut moved = false;
     let mut swap_point = sdl2::rect::Point::new(0, 0);
     for i in 1..path.len() {
@@ -221,10 +203,8 @@ pub fn update_liquid(api: &mut SandApi, cell: Cell) -> Result<(), Error> {
     // fall down
     if go_toward(api, dx, 2, cell)? {
         return Ok(())
-    } else {
-        if go_toward(api, dx*2, 0, cell)? {
-            return Ok(())
-        }
+    } else if go_toward(api, dx*2, 0, cell)? {
+        return Ok(())
     }
     if can_swap(api, 0, 1) {
         api.swap(0, 1, cell)?;
@@ -417,24 +397,20 @@ pub fn update_mud(api: &mut SandApi, mut cell: Cell) -> Result<(), Error> {
                         api.set(neighbor.dx, neighbor.dy, EMPTY)?;
                         cell.species = Mud (own_wetness + 1 );
                         api.set(0, 0, cell)?;
-                    } else {
-                        if neighbor.dy == -1 
-                        && rng.gen::<u32>() % 1000 < 30 
-                        && api.get(-1, -1)?.species != Species::WaterGrass(0)
-                        && api.get( 1, -1)?.species != Species::WaterGrass(0) {
-                            api.set(0, -1, Cell::water_grass())?;
-                        }
+                    } else if neighbor.dy == -1 
+                    && rng.gen::<u32>() % 1000 < 30 
+                    && api.get(-1, -1)?.species != Species::WaterGrass(0)
+                    && api.get( 1, -1)?.species != Species::WaterGrass(0) {
+                        api.set(0, -1, Cell::water_grass())?;
                     }
                 }
 
                 Empty => {
                     if own_wetness >= 1 
-                    && neighbor.dy >= 0 {
-                        if rng.gen::<u32>() % 100 < 10 {
-                            cell.species = Mud (own_wetness - 1 );
-                            api.set(neighbor.dx, neighbor.dy, Cell::new(Species::Water))?;
-                            api.set(0, 0, cell)?;
-                        }
+                    && neighbor.dy >= 0 && rng.gen::<u32>() % 100 < 10 {
+                        cell.species = Mud (own_wetness - 1 );
+                        api.set(neighbor.dx, neighbor.dy, Cell::new(Species::Water))?;
+                        api.set(0, 0, cell)?;
                     }
                 }
                 
@@ -545,26 +521,19 @@ pub fn update_water_grass(api: &mut SandApi, mut cell: Cell) -> Result<(), Error
     let dx = *[1, 0, -1].choose(&mut rng).unwrap();
 
 
-    if api.neighbors()?.iter().all(|n| n.cell.species != Species::Water) {
-        if rng.gen::<u32>() % 100 < 1 {
-            api.set(0, 0, Cell::mud())?;
-            return Ok(())
-        }
+    if api.neighbors()?.iter().all(|n| n.cell.species != Species::Water) && rng.gen::<u32>() % 100 < 1 {
+        api.set(0, 0, Cell::mud())?;
+        return Ok(())
     }
 
-    if api.neighbors()?.iter().any(|n| n.cell == EMPTY ) {
-        if rng.gen::<u32>() % 100 < 1 {
-            api.set(0, 0, Cell::new(Species::Water))?;
-            return Ok(())
-        }
+    if api.neighbors()?.iter().any(|n| n.cell == EMPTY ) && rng.gen::<u32>() % 100 < 1 {
+        api.set(0, 0, Cell::new(Species::Water))?;
+        return Ok(())
     }
 
     if api.neighbors()?.iter().filter(|n| n.dy > 0).all(|n|  
         {
-            match n.cell.species {
-                Species::WaterGrass(_) | Species::Mud(_) => false,
-                _ => true,
-            }
+            !matches!(n.cell.species, Species::WaterGrass(_) | Species::Mud(_))
     }) {
         update_coarse(api, cell)?;
     }

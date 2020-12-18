@@ -148,11 +148,9 @@ impl SandApi {
                 let nx = a + x;
                 let ny = b + y; 
                 if let Ok(c) = self.get_absolute(nx, ny) {
-                    if util::distance(x, y, nx, ny) <= radius as f32 {
-                        if c == EMPTY {
-                            cell.regrain();
-                            self.set_absolute(nx, ny, cell)?;
-                        }
+                    if util::distance(x, y, nx, ny) <= radius as f32 && c == EMPTY {
+                        cell.regrain();
+                        self.set_absolute(nx, ny, cell)?;
                     }
                 }
             }
@@ -173,10 +171,8 @@ impl SandApi {
                 let nx = a + x;
                 let ny = b + y; 
                 if let Ok(c) = self.get_absolute(nx, ny) {
-                    if c.species != Species::Border { 
-                        if util::distance(x, y, nx, ny) <= radius as f32 {
-                            self.set_absolute(nx, ny, EMPTY)?;
-                        }
+                    if c.species != Species::Border && util::distance(x, y, nx, ny) <= radius as f32 {
+                        self.set_absolute(nx, ny, EMPTY)?;
                     }
                 }
             }

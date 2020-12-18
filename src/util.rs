@@ -1,7 +1,7 @@
 use sdl2::rect::Point;
 
 pub fn distance(x0: i32, y0: i32, x1: i32, y1: i32) -> f32 {
-    return f32::sqrt(
+    f32::sqrt(
             ((x1 - x0).pow(2) as f32)
             +
             ((y1 - y0).pow(2) as f32)
