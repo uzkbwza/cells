@@ -10,6 +10,7 @@ use crate::{util, Controls, WIDTH};
 struct CellRenderInfo {
     point: Point,
     species: Species,
+    heat: i16,
     grain: u8,
 }
 
@@ -18,7 +19,8 @@ impl CellRenderInfo {
         CellRenderInfo { 
             point: Point::new(x, y),
             species: cell.species,
-            grain: cell.grain
+            grain: cell.grain,
+            heat: cell.heat,
         }
     }
 }
@@ -32,6 +34,7 @@ fn species_color(species: Species) -> Color {
             Color::RGB(150 - wetness * 23, 70 - wetness * 20, 33 - wetness * 8),
         Species::Acid => Color::RGB(0, 255, 100),
         Species::Wall => Color::GRAY,
+        Species::Stone => Color::RGB(95, 89, 70),
         Species::Grass | Species::GrassTip => Color::GREEN,
         Species::Flower(c) => c,
         Species::Soil => Color::RGB(50, 10, 10),
@@ -64,6 +67,10 @@ fn cell_color(cell: CellRenderInfo )
     color.r = apply_grain(color.r, cell.grain, 40);
     color.g = apply_grain(color.g, cell.grain, 40);
     color.b = apply_grain(color.b, cell.grain, 40);
+
+    if cell.species != Species::Steam {
+        color.r = i16::min(color.r as i16 + (cell.heat - 20) / 5, 255) as u8;
+    }
     color
 }
 

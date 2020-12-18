@@ -27,6 +27,7 @@ pub enum Species {
     SaltWater,
     Steam,
     Lava,
+    Stone,
 }
 
 impl Species {
@@ -81,7 +82,7 @@ impl Cell {
         let mut rng = thread_rng();
 
         let heat = match species {
-            Lava => 2000,
+            Lava => 5000,
             _    => 20,
         };
 
@@ -119,6 +120,11 @@ impl Cell {
     pub fn liquid_destroyable(&self) -> bool {
         use Species::*;
         matches!(self.species, Grass | GrassTip | Flower(_))
+    }
+
+    pub fn turns_to_lava(&self) -> bool {
+        use Species::*;
+        matches!(self.species, Sand | Mud(_) | Salt | Soil | Stone )
     }
 
     // resets grain on cell. this is basically just for using the brush, 
@@ -201,7 +207,7 @@ pub fn update_liquid(api: &mut SandApi, cell: Cell) -> Result<(), Error> {
     }
     
     // fall down
-    if go_toward(api, dx, 2, cell)? {
+    if go_toward(api, 0, 2, cell)? {
         return Ok(())
     } else if go_toward(api, dx*2, 0, cell)? {
         return Ok(())
@@ -556,14 +562,14 @@ pub fn update_water_grass(api: &mut SandApi, mut cell: Cell) -> Result<(), Error
 
 pub fn update_lava(api: &mut SandApi, mut cell: Cell) -> Result<(), Error> {
     let mut rng = thread_rng();
-    if cell.heat < 150 && rng.gen::<u32>() % 100 < 1 {
-        cell.species = Species::Sand;
+    if cell.heat < 1000 && rng.gen::<u32>() % 100 < 1 {
+        cell.species = Species::Stone;
         return api.set(0, 0, cell);
     }
     for n in api.neighbors()?.iter_mut() {
         if n.cell.heat < cell.heat && n.cell != EMPTY {
-            n.cell.heat = cmp::min(n.cell.heat + 5, cell.heat);
-            cell.heat -= 5;
+            n.cell.heat = cmp::min(n.cell.heat + 100, cell.heat);
+            cell.heat -= 10;
             api.set(n.dx, n.dy, n.cell)?;
             api.set(0, 0, cell)?;
         }
@@ -579,10 +585,18 @@ pub fn update_lava(api: &mut SandApi, mut cell: Cell) -> Result<(), Error> {
 
 pub fn update_steam(api: &mut SandApi, mut cell: Cell) -> Result<(), Error> {
     let mut rng = thread_rng();
-    let dx = *[1, 0, -1].choose(&mut rng).unwrap();
+    let dx = *[1, 0, 0, -1].choose(&mut rng).unwrap();
  
     if rng.gen::<u32>() % 1000 < 5 {
         api.set(0, 0, EMPTY)?;
+        return Ok(())
+    }
+
+    if rng.gen::<i16>() % 100 < (70 - (cell.heat - 100))  {
+        let dy = *[1, 0, 0, 0, 0, 0, -1].choose(&mut rng).unwrap();
+        if api.is_empty(dx, dy) {
+            api.swap(dx, dy, cell)?;
+        }
         return Ok(())
     }
 

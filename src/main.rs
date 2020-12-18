@@ -99,6 +99,7 @@ fn poll_controls(controls: &mut Controls, event_pump: &mut sdl2::EventPump) -> O
                     controls.set_species(
                         match k {
                             S => Species::Sand,
+                            N => Species::Stone,
                             W => Species::Water, 
                             A => Species::Wall,
                             I => Species::Acid,
@@ -131,6 +132,8 @@ fn poll_controls(controls: &mut Controls, event_pump: &mut sdl2::EventPump) -> O
 }
 
 fn handle_controls(controls: &Controls, api: &mut api::SandApi) -> Result<(), Error> {
+    api.highlighted.x = controls.mouse_x;
+    api.highlighted.y = controls.mouse_y;
     if controls.mouse_pressed_l {
         for point in util::line(
             controls.mouse_x, 
@@ -188,6 +191,8 @@ pub fn main() -> Result<(), Error>{
     let mut tex = texture_creator.create_texture_streaming(PixelFormatEnum::RGBA8888, WIDTH, HEIGHT).unwrap();
     'running: loop {
         canvas.clear();
+
+        handle_controls(&mut controls, &mut sand_api)?;
         sdl_context.mouse().show_cursor(false);
         if controls.mouse_pressed_l || controls.mouse_pressed_r {
             sdl_context.mouse().capture(true);
@@ -202,8 +207,8 @@ pub fn main() -> Result<(), Error>{
             _    => break 'running
         };
         // The rest of the game loop goes here...
-        handle_controls(&mut controls, &mut sand_api)?;
         sand_api.update()?;
+        //println!("{:?}", sand_api.get_absolute(sand_api.highlighted.x, sand_api.highlighted.y));
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 120));
     }

@@ -2,6 +2,7 @@ use crate::cell::*;
 use crate::util;
 use crate::map2d::*;
 use crate::{WIDTH, HEIGHT, Error};
+use rand::prelude::*;
 
 type CellMap = Map2d<Cell>;
 
@@ -11,7 +12,8 @@ pub struct SandApi {
     pub width: i32,
     pub height: i32,
     paused: bool,
-    map: CellMap
+    map: CellMap,
+    pub highlighted: sdl2::rect::Point,
 }
 
 pub struct Neighbor {
@@ -45,6 +47,7 @@ impl SandApi {
             height: map.height,
             paused: false,
             map, 
+            highlighted: sdl2::rect::Point::new(0, 0),
         }
     }
 
@@ -52,18 +55,27 @@ impl SandApi {
         if self.paused { 
             return Ok(()) 
         }
-        for x in 0..WIDTH {
-            for y in 0..HEIGHT {
-                self.x = x as i32;
-                self.y = y as i32;
-                self.update_cell()?;
+        for y in 0..HEIGHT {
+            // go from left to right every even row...
+            if y % 2 == 0 {
+                for x in (0..WIDTH) {
+                    self.set_cursor(x as i32, y as i32);
+                    self.update_cell()?;
+                }
+            } else {
+                // and right to left every odd.
+                for i in (0..WIDTH) {
+                    let x = WIDTH - i;
+                    self.set_cursor(x as i32, y as i32);
+                    self.update_cell()?;
+                }
             }
         }
 
+        self.update_heat()?; 
         for x in 0..WIDTH{
             for y in 0..HEIGHT{
-                self.x = x as i32;
-                self.y = y as i32;
+                self.set_cursor(x as i32, y as i32);
                 let mut cell = self.get(0, 0)?;
                 cell.clock = false; 
                 self.set(0, 0, cell)?;
@@ -71,6 +83,43 @@ impl SandApi {
         }
         self.x = 0;
         self.y = 0;
+        Ok(())
+    }
+
+    fn update_heat(&mut self) -> Result<(), Error> {
+        let mut rng = thread_rng();
+        for x in 1..WIDTH - 1{
+            for y in 1..HEIGHT - 1{
+                self.x = x as i32;
+                self.y = y as i32;
+                let mut cell = self.get(0, 0)?;
+                if cell != EMPTY {
+                    for n in self.neighbors()?.iter() {
+                        let mut neighbor = n.cell;
+                        if neighbor == EMPTY {
+                            continue
+                        }
+                        if cell.heat > neighbor.heat + 5 && cell.heat > 20 {
+                            cell.heat -= 5;
+                            neighbor.heat += 5; 
+                        } else if cell.heat == neighbor.heat {
+                            if rng.gen_bool(0.4) {
+                                cell.heat -= 1;
+                                neighbor.heat -= 1;
+                            }
+                        }
+                        self.set(n.dx,n.dy,neighbor)?;
+                    }
+                    if self.neighbors()?.iter().filter(|n| n.cell != EMPTY).collect::<Vec<&Neighbor>>().len() == 0 && cell.heat > 20 {
+                        cell.heat -= 3;
+                    }
+                    if cell.heat < 20 {
+                        cell.heat += 1;
+                    }
+                }
+                self.set(0,0,cell)?;
+            }
+        }
         Ok(())
     }
 
@@ -88,7 +137,14 @@ impl SandApi {
             cell.clock = true; 
         }
 
-        cell.heat -= 1; 
+        if cell.turns_to_lava() && cell.heat > 1000 {
+            let mut rng = thread_rng();
+            if rng.gen::<usize>() % 100 < 5 {
+                cell.species = Lava;
+                self.set(0, 0, cell)?;
+            }
+        } 
+
         match cell.species {
             Sand => update_sand(self, cell)?,
             Water => update_water(self, cell)?, 
@@ -105,6 +161,7 @@ impl SandApi {
             SaltWater     => update_salt_water(self, cell)?,
             _             => {}
         };
+
 
         Ok(())
     }
@@ -224,4 +281,5 @@ impl Default for SandApi {
         Self::new()
     }
 }
+
 
