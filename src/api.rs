@@ -52,7 +52,6 @@ impl SandApi {
         if self.paused { 
             return Ok(()) 
         }
-
         for x in 0..WIDTH {
             for y in 0..HEIGHT {
                 self.x = x as i32;

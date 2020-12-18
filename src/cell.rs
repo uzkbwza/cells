@@ -2,6 +2,7 @@ use rand::prelude::*;
 use rand::seq::SliceRandom;
 use crate::api::*;
 use crate::Error;
+use crate::util::line;
 use sdl2::pixels::Color;
 use std::cmp;
 
@@ -180,6 +181,29 @@ pub const EMPTY: Cell = Cell {
     grain: 0,
 };
 
+fn go_toward(api: &mut SandApi, x: i32, y: i32, cell: Cell) -> Result<bool, Error> {
+    // tries to go as far as possible towards the next point
+    let mut path = line(0, 0, x, y);
+    let mut moved = false;
+    let mut swap_point = sdl2::rect::Point::new(0, 0);
+    for i in 1..path.len() {
+        let dx = path[i].x;
+        let dy = path[i].y;
+        if api.is_empty(dx, dy) {
+            moved = true;
+            swap_point = path[i];
+        } else {
+            break;
+        }
+    }
+
+    if moved {
+        api.swap(swap_point.x, swap_point.y, cell)?;
+    }
+    //api.set_cursor(start_x, start_y);
+    Ok(moved)
+}
+
 pub fn update_liquid(api: &mut SandApi, cell: Cell) -> Result<(), Error> {
     let mut rng = thread_rng();
     let dirs = [1, 0, -1];
@@ -193,7 +217,15 @@ pub fn update_liquid(api: &mut SandApi, cell: Cell) -> Result<(), Error> {
     fn can_swap(api: &mut SandApi, x: i32, y: i32) -> bool {
         api.is_empty(x, y) || api.get(x, y).unwrap().is_gas()
     }
+    
     // fall down
+    if go_toward(api, dx, 2, cell)? {
+        return Ok(())
+    } else {
+        if go_toward(api, dx*2, 0, cell)? {
+            return Ok(())
+        }
+    }
     if can_swap(api, 0, 1) {
         api.swap(0, 1, cell)?;
         return Ok(())
@@ -567,7 +599,7 @@ pub fn update_lava(api: &mut SandApi, mut cell: Cell) -> Result<(), Error> {
             api.set(0, 0, cell)?;
         }
     }
-    if rng.gen::<u32>() % 100 < 10 {
+    if rng.gen::<u32>() % 100 < 90 {
         update_liquid(api, cell)?;
     } else {
         update_powder(api, cell)?;
