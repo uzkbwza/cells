@@ -1,4 +1,3 @@
-#![feature(clamp)]
 extern crate sdl2; 
 pub mod cell;
 pub mod render;
