@@ -29,7 +29,7 @@ fn species_color(species: Species) -> Color {
     match species {
         Species::Sand => Color::RGB(190, 140, 40),
         Species::Water => 
-            Color::RGB(30, 100, 235),
+            Color::RGB(10, 100, 235),
         Species::Mud(wetness) => 
             Color::RGB(150 - wetness * 23, 70 - wetness * 20, 33 - wetness * 8),
         Species::Acid => Color::RGB(0, 255, 100),
@@ -38,13 +38,17 @@ fn species_color(species: Species) -> Color {
         Species::Grass | Species::GrassTip => Color::GREEN,
         Species::Flower(c) => c,
         Species::Soil => Color::RGB(50, 10, 10),
-        Species::WaterGrass(_) => Color::RGB(10, 100, 40),
+        Species::WaterGrass(_) => Color::RGB(1, 70, 4),
         Species::Steam => Color::RGB(90, 190, 255),
         Species::Lava => Color::RGB(255, 50, 0),
+        Species::Fire   => Color::RGB(255, 20, 0),
+        Species::BlueFire   => Color::RGB(250, 250, 255),
         Species::Empty => Color::RGB(0, 2, 5),
         Species::Salt => Color::RGB(254, 240, 200),
         Species::SaltWater => Color::RGB(130, 130, 220),
         Species::Border => Color::RGB(1, 1, 1),
+        Species::Ice => Color::RGB(200, 240, 250),
+        Species::Clone(_) => Color::RGB(170, 120, 170),
         #[allow(unreachable_patterns)]
         _                       => Color::MAGENTA,
     }
@@ -67,8 +71,12 @@ fn cell_color(cell: CellRenderInfo )
     color.r = apply_grain(color.r, cell.grain, 40);
     color.g = apply_grain(color.g, cell.grain, 40);
     color.b = apply_grain(color.b, cell.grain, 40);
-
-    if cell.species != Species::Steam {
+    if cell.species == Species::Fire {
+        color.g = usize::min((color.g as usize + cell.grain as usize) % 255, 240) as u8;
+    } else if cell.species == Species::BlueFire {
+        color.g = usize::min((color.g as usize + cell.grain as usize) % 255, 200) as u8;
+        color.r = usize::min((color.g as usize + cell.grain as usize) % 255, 240) as u8;
+    } else if cell.species != Species::Steam && cell.species != Species::Border {
         color.r = i16::min(color.r as i16 + (cell.heat - 20) / 5, 255) as u8;
     }
     color
@@ -86,8 +94,9 @@ pub fn render<T: RenderTarget>(api: &mut SandApi, canvas: &mut Canvas<T>, tex: &
             let mut unpacked = vec![c.a, c.b, c.g, c.r];
             v.append(&mut unpacked);
         }
-    } 
-    tex.update(None, &v, WIDTH as usize * 4).unwrap();
+    }
+
+    tex.update(None, &v, api.width as usize * 4).unwrap();
     canvas.copy(tex, None, None).unwrap();
     Ok(())
 }

@@ -1,8 +1,10 @@
 use crate::cell::*;
 use crate::util;
 use crate::map2d::*;
-use crate::{WIDTH, HEIGHT, Error};
+use crate::{WIDTH, HEIGHT, BORDERS, Error};
 use rand::prelude::*;
+use std::iter::Flatten;
+use std::slice::Iter;
 
 type CellMap = Map2d<Cell>;
 
@@ -11,9 +13,11 @@ pub struct SandApi {
     y: i32,
     pub width: i32,
     pub height: i32,
+    borders: bool,
     paused: bool,
     map: CellMap,
     pub highlighted: sdl2::rect::Point,
+    cloned_cells: Zone<Species>,
 }
 
 pub struct Neighbor {
@@ -25,54 +29,80 @@ pub struct Neighbor {
 impl SandApi {
     pub fn new() -> SandApi {
         let mut map = Map2d::filled_with(EMPTY, WIDTH as i32, HEIGHT as i32);
-
-
-
-        // walls
-        for y in 0..HEIGHT as i32 {
-            map.set_point(0,            y, Cell::new(Species::Border)).unwrap();
-            map.set_point((WIDTH-1) as i32, y, Cell::new(Species::Border)).unwrap();
-        }
-
-        // floor/ceiling 
-        for x in 0..WIDTH as i32 {
-            map.set_point(x,             0, Cell::new(Species::Border)).unwrap();
-            map.set_point(x, (HEIGHT-1) as i32, Cell::new(Species::Border)).unwrap();
-        }
-
-        SandApi {
+        let mut api = SandApi {
             x: 0,
             y: 0,
             width: map.width,
             height: map.height,
             paused: false,
-            map, 
+            map,
+            borders: BORDERS,
             highlighted: sdl2::rect::Point::new(0, 0),
+            cloned_cells: Zone::new(),
+        };
+        if api.borders {
+            //walls
+            for y in 0..HEIGHT as i32 {
+                api.map.set_point(0, y, Cell::new(Species::Border)).unwrap();
+                api.map.set_point((WIDTH - 1) as i32, y, Cell::new(Species::Border)).unwrap();
+            }
+
+            // floor/ceiling
+            for x in 0..WIDTH as i32 {
+                api.map.set_point(x, 0, Cell::new(Species::Border)).unwrap();
+                api.map.set_point(x, (HEIGHT - 1) as i32, Cell::new(Species::Border)).unwrap();
+            }
         }
+        api
+    }
+    pub fn init(&mut self) {
+        // wall
+        *self = Self::new();
+    }
+
+    pub fn store_cloned_cell(&mut self, species: Species) -> Option<CloneId> {
+        self.cloned_cells.insert(species)
+    }
+
+    pub fn get_cloned_cell(&mut self, id: CloneId) -> Cell {
+        Cell::new(self.cloned_cells.get(id).unwrap())
     }
 
     pub fn update(&mut self) -> Result<(), Error> {
         if self.paused { 
             return Ok(()) 
         }
+
         for y in 0..HEIGHT {
-            // go from left to right every even row...
-            if y % 2 == 0 {
-                for x in (0..WIDTH) {
-                    self.set_cursor(x as i32, y as i32);
-                    self.update_cell()?;
+            let y = HEIGHT - y;
+            // bias from left to right every even row...
+            for x in (0..WIDTH) {
+                let mut x = x;
+                if y % 2 == 0 {
+                    x = WIDTH - x
                 }
-            } else {
-                // and right to left every odd.
-                for i in (0..WIDTH) {
-                    let x = WIDTH - i;
-                    self.set_cursor(x as i32, y as i32);
-                    self.update_cell()?;
-                }
+                self.set_cursor(x as i32, y as i32);
+                self.update_heat()?;
+                self.update_cell()?;
             }
         }
 
-        self.update_heat()?; 
+        // keep track of cloned cells
+        let mut clone_ids = Vec::new();
+        for x in 0..WIDTH{
+            for y in 0..HEIGHT {
+                let cell = self.get_absolute(x as i32, y as i32)?;
+                if let Species::Clone(Some(id)) = cell.species {
+                    clone_ids.push(id);
+                }
+            }
+        }
+        for i in 0..self.cloned_cells.len() as u16 {
+            if !clone_ids.contains(&i) {
+                self.cloned_cells.remove(i.into());
+            }
+        }
+
         for x in 0..WIDTH{
             for y in 0..HEIGHT{
                 self.set_cursor(x as i32, y as i32);
@@ -83,44 +113,66 @@ impl SandApi {
         }
         self.x = 0;
         self.y = 0;
+        if !self.borders {
+            for y in 0..self.height {
+                self.set(0, y, EMPTY)?;
+                self.set(self.width as i32 - 1, y, EMPTY)?;
+            }
+            for x in 0..self.width {
+                self.set(x, 0, EMPTY)?;
+                self.set(x, self.height as i32 - 1, EMPTY)?;
+            }
+        }
+
         Ok(())
     }
 
     fn update_heat(&mut self) -> Result<(), Error> {
+        use Species::*;
+        let mut cell = self.get(0, 0)?;
+        if matches!(cell.species, Empty | Clone(_) | Border ) {
+            return Ok(())
+        }
         let mut rng = thread_rng();
-        for x in 1..WIDTH - 1{
-            for y in 1..HEIGHT - 1{
-                self.x = x as i32;
-                self.y = y as i32;
-                let mut cell = self.get(0, 0)?;
-                if cell != EMPTY {
-                    for n in self.neighbors()?.iter() {
-                        let mut neighbor = n.cell;
-                        if neighbor == EMPTY {
-                            continue
-                        }
-                        if cell.heat > neighbor.heat + 5 && cell.heat > 20 {
-                            cell.heat -= 5;
-                            neighbor.heat += 5; 
-                        } else if cell.heat == neighbor.heat {
-                            if rng.gen_bool(0.4) {
-                                cell.heat -= 1;
-                                neighbor.heat -= 1;
-                            }
-                        }
-                        self.set(n.dx,n.dy,neighbor)?;
-                    }
-                    if self.neighbors()?.iter().filter(|n| n.cell != EMPTY).collect::<Vec<&Neighbor>>().len() == 0 && cell.heat > 20 {
-                        cell.heat -= 3;
-                    }
-                    if cell.heat < 20 {
-                        cell.heat += 1;
-                    }
-                }
-                self.set(0,0,cell)?;
+        if cell.is_flammable() {
+            if cell.heat >= 3000 {
+                cell.species = BlueFire
+            } else if cell.heat >= 800 {
+                cell.species = Fire
             }
         }
-        Ok(())
+        let mut alone = true;
+        let neighbors = self.neighbors()?;
+        for n in neighbors.iter() {
+            let mut neighbor = n.cell;
+            if matches!(neighbor.species, Empty | Border) {
+                continue
+            } else {
+                alone = false;
+            }
+            let mut changed = false;
+            if cell.heat > neighbor.heat + 10 {
+                cell.heat -= 10;
+                neighbor.heat += 10;
+                changed = true;
+            } else if cell.heat == neighbor.heat {
+                if rng.gen_bool(0.4) {
+                    cell.heat -= 1;
+                    neighbor.heat -= 1;
+                    changed = true;
+                }
+            }
+            if changed {
+                self.set(n.dx,n.dy,neighbor)?;
+            }
+        }
+        if alone && cell.heat > cell.species.starting_temp() {
+            cell.heat -= 3;
+        }
+        if cell.heat < cell.species.starting_temp() {
+            cell.heat += 1;
+        }
+        self.set(0,0,cell)
     }
 
     pub fn toggle_pause(&mut self) {
@@ -137,7 +189,7 @@ impl SandApi {
             cell.clock = true; 
         }
 
-        if cell.turns_to_lava() && cell.heat > 1000 {
+        if cell.turns_to_lava() && cell.heat > 1600 {
             let mut rng = thread_rng();
             if rng.gen::<usize>() % 100 < 5 {
                 cell.species = Lava;
@@ -155,10 +207,14 @@ impl SandApi {
             GrassTip => update_grass_tip(self, cell)?,
             Flower(_) => update_flower(self, cell)?,
             WaterGrass(_) => update_water_grass(self, cell)?,
-            Lava          => update_lava(self, cell)?,
-            Steam         => update_steam(self, cell)?,
-            Salt          => update_salt(self, cell)?,
-            SaltWater     => update_salt_water(self, cell)?,
+            Lava => update_lava(self, cell)?,
+            Steam => update_steam(self, cell)?,
+            Salt => update_salt(self, cell)?,
+            SaltWater => update_salt_water(self, cell)?,
+            Fire => update_fire(self, cell)?,
+            BlueFire => update_fire(self, cell)?,
+            Ice => update_ice(self, cell)?,
+            Clone(_) => update_clone(self, cell)?,
             _             => {}
         };
 
@@ -185,7 +241,7 @@ impl SandApi {
         Ok(())
     }
 
-    pub fn get_absolute(&mut self, x: i32, y: i32) -> Result<Cell, Error> {
+    pub fn get_absolute(&self, x: i32, y: i32) -> Result<Cell, Error> {
         let cell = self.map.retrieve(x, y)?;
         Ok(cell)
     }
@@ -282,4 +338,49 @@ impl Default for SandApi {
     }
 }
 
+struct Zone<T: PartialEq> {
+    contents: Vec<Option<T>>
+}
 
+impl<T: PartialEq> Zone<T> {
+    pub fn new() -> Self {
+        Zone {
+            contents: Vec::new(),
+        }
+    }
+    pub fn insert(&mut self, t: T) -> Option<u16> {
+        if self.contents.is_empty() {
+            self.contents.push(Some(t));
+            Some(0)
+        } else {
+            let index = self.contents.iter().enumerate().find(|(_, x)| **x == None);
+            match index {
+                Some((i, _)) => {
+                    self.contents[i] = Some(t);
+                    Some(i as u16)
+                },
+                None => {
+                    if self.len() < i16::max_value() as usize {
+                        self.contents.push(Some(t));
+                        Some(self.contents.len() as u16 - 1)
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.contents.len()
+    }
+
+    pub fn get(&self, i: u16) -> &Option<T> {
+        &self.contents[i as usize]
+    }
+    pub fn remove(&mut self, i: u16) -> Option<T> {
+        let mut val = None;
+        std::mem::swap(&mut val, &mut self.contents[i as usize]);
+        val
+    }
+}

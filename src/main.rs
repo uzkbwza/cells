@@ -1,10 +1,11 @@
-extern crate sdl2; 
+extern crate sdl2;
 pub mod cell;
 pub mod render;
 pub mod api;
 pub mod util;
 pub mod map2d;
 
+use generational_arena::Arena;
 use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -18,6 +19,7 @@ use sdl2::pixels::PixelFormatEnum;
 const WIDTH:  u32 = 360;
 const HEIGHT: u32 = 240;
 const SCALE: u32 = 3;
+const BORDERS: bool = true;
 
 pub enum ExitCode {
     Success,
@@ -44,6 +46,7 @@ pub struct Controls {
     pub mouse_pressed_l: bool,
     pub mouse_pressed_r: bool,
     pub pause: bool,
+    pub restart: bool,
     pub selected_species: Species,
     pub radius: i32,
 }
@@ -58,6 +61,7 @@ impl Controls {
             mouse_pressed_l: false,
             mouse_pressed_r: false,
             pause: false,
+            restart: false,
             selected_species: Species::Sand,
             radius: 4,
         }
@@ -101,9 +105,13 @@ fn poll_controls(controls: &mut Controls, event_pump: &mut sdl2::EventPump) -> O
                             N => Species::Stone,
                             W => Species::Water, 
                             A => Species::Wall,
-                            I => Species::Acid,
+                            C => Species::Acid,
                             L => Species::Lava,
                             T => Species::Salt,
+                            F => Species::Fire,
+                            I => Species::Ice,
+                            B => Species::BlueFire,
+                            O => Species::Clone(None),
                             _ => controls.selected_species
                         }
                     );
@@ -120,6 +128,7 @@ fn poll_controls(controls: &mut Controls, event_pump: &mut sdl2::EventPump) -> O
                     );
                     match k {
                         P | Space => controls.pause = true,
+                        F1 => controls.restart = true,
                         _ => {}
                     }
                 }
@@ -130,7 +139,7 @@ fn poll_controls(controls: &mut Controls, event_pump: &mut sdl2::EventPump) -> O
     None
 }
 
-fn handle_controls(controls: &Controls, api: &mut api::SandApi) -> Result<(), Error> {
+fn handle_controls(controls: &mut Controls, api: &mut api::SandApi) -> Result<(), Error> {
     api.highlighted.x = controls.mouse_x;
     api.highlighted.y = controls.mouse_y;
     if controls.mouse_pressed_l {
@@ -140,11 +149,18 @@ fn handle_controls(controls: &Controls, api: &mut api::SandApi) -> Result<(), Er
             controls.mouse_last_x, 
             controls.mouse_last_y) 
         {
+            use Species::*;
+            let cell = match controls.selected_species {
+                Clone(_) => Cell::clone(),
+                Mud(_) => Cell::mud(),
+                Flower(_) => Cell::clone(),
+                _ => Cell::new(controls.selected_species),
+            };
             api.brush(
                 point.x, 
                 point.y, 
                 controls.radius, 
-                Cell::new(controls.selected_species)
+                cell
             )?;
         }
     }
@@ -163,6 +179,11 @@ fn handle_controls(controls: &Controls, api: &mut api::SandApi) -> Result<(), Er
     if controls.pause {
         api.toggle_pause();
     }
+    if controls.restart {
+        api.init();
+        controls.restart = false;
+    }
+
     Ok(())
 }
 
@@ -207,7 +228,7 @@ pub fn main() -> Result<(), Error>{
         };
         // The rest of the game loop goes here...
         sand_api.update()?;
-        //println!("{:?}", sand_api.get_absolute(sand_api.highlighted.x, sand_api.highlighted.y));
+        //println!("{}, {}, {:?}", &sand_api.highlighted.x, &sand_api.highlighted.y, &sand_api.get_absolute(sand_api.highlighted.x, sand_api.highlighted.y));
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 120));
     }
