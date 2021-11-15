@@ -2,7 +2,7 @@ use crate::{WIDTH, HEIGHT, Error};
 
 #[derive(Debug)]
 pub struct Map2d<T> {
-    pub items: [T; WIDTH as usize * HEIGHT as usize],
+    pub items: Box<[T; WIDTH as usize * HEIGHT as usize]>,
     pub width: i32,
     pub height: i32,
     default: T
@@ -10,7 +10,7 @@ pub struct Map2d<T> {
 
 impl<T> Map2d<T> where T: Clone + Copy {
     pub fn filled_with(item: T, width: i32, height: i32) -> Self {
-        let items = [item; (WIDTH * HEIGHT) as usize];
+        let items = Box::new([item; (WIDTH * HEIGHT) as usize]);
         let default = item;
         Map2d {
             items,
